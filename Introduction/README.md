@@ -13,12 +13,12 @@
    <font color=#FF000>type参数指定了socket的类型，取值包括</font>：<br></br>
    <font color=blue>`SOCK_STREAM` 面向连接，对数据传输进行保障，基于TCP</font><br></br>
    <font color=blue>`SOCK_DGRAM` 面向消息，无数据传输保障，基于UDP</font><br></br>
-   <font color=blue>`SOCK_ROW` 原始socket，用于处理普通socket无法处理的ICMP、IGMP报文</font><br></br>
+   <font color=blue>`SOCK_ROW` 原始socket，用于处理普通socket无法处理的ICMP、IGMP报文使用原始socket的网络应用可以绕过网络层直接使用IPv4、IPv6</font><br></br>
    <font color=#FF000>protocol参数指定了使用的网络协议，通常为0，表示使用socket对应的默认网络协议</font>
    <br></br>
    `socket(family,type,protocol)`会返回一个整数值用以标识创建的socket<br></br>
 2.  **将IP、端口信息绑定至socket，调用`bind(sockfd,name,namelen)`完成**<br></br>
-   <font color=#FF000>sockfd参数是socket的handle(一个整数)，由此句柄来识别一个socket</font><br></br>
+   <font color=#FF000>sockfd参数是socket的handle(一个整数)，由此handle来识别一个socket</font><br></br>
    <font color=#FF000>name参数是包含了要绑定到的socket的地址类型、IP地址、端口的协议地址结构体指针</font><br></br>
    <font color=#FF000>namelen参数为name参数的长度</font><br></br>
 3. **将socket设置为监听socket，调用`listen(sockfd,backlog)`完成**<br></br>
