@@ -93,7 +93,72 @@ int memcmp(const void* ptr1, const void* ptr2, size_t nbytes);  //对比任意�
 ## 地址转换函数
 完成点分十进制字符串的IP地址(便于阅读及输入)与网络字节序的二进制值的IP地址(存储在socket地址结构中)的互相转换
 ```c
-int inte_aton(const char* strptr, struct in_addr* addrptr);//将strptr所指的点分十进制IPv4地址转换为32位的网络字节序地址，存储在in_addr所指的socket地址结构中
+int inet_aton(const char* strptr, struct in_addr* addrptr);//将strptr所指的点分十进制IPv4地址转换为32位的网络字节序地址，存储在in_addr所指的socket地址结构中
 
+in_addr_t inet_addr(const char* strptr)//将点分十进制字符串转换为网络字节序的二进制值，与inet_aton执行相同的转换，但是该函数不能处理255.255.255.255
 
+char* inet_ntoa(struct in_addr inaddr);//返回指向点分十进制字符串的指针
+
+//上面的函数只适用于IPv4的地址转换，以下函数适用与IPv4与IPv6
+int inet_pton(int family, const char* strptr, void* addrptr);//将strptr指针所指的字符串地址，转换位二进制结果，存放在addrptr所指的地址中，调用成功则返回1，输入格式有误则为0，出错返回-1
+
+const char* inet_ntop(int family, const void* addrptr, char* strptr, size_t len);//从二进制格式转换为char格式，len表示char格式的大小，正确处理返回指向strprt指针，否则返回NULL
 ```
+`inet_addr`不能处理`255.255.255.255`的原因是当该函数出错时通常返回`INADDR_NONE`(32位全为1的值)
+
+
+## 字节流socket读写函数
+这些函数完成对字节流socket进行读写的操作，包括以下三种函数
+```c
+//从一个描述符读取n个字节
+ssize_t readn(int filedes, void* buff, size_t nbytes);
+
+//向一个描述符中写入n个字节
+ssize_t written(int filedes, const void* buff, size_t nbytes);
+
+//从一个描述符读取文本行，一次一个字节
+ssize_t readline(int filedes, void* buff, size_t maxlen);//每读取一个字节就调用一次read，执行速度很慢
+```
+在对socket进行读写的过程中，可能由于socket的缓冲区已经到达了极限，因此会存在一次性不能完全读取所需字节的情况，因此在这三个函数中均会捕获`EINTR`错误，捕获到该错误时会继续进行读写。
+
+
+## 习题
+1. 为什么诸如套接字地址结构的长度之类的值-结果参数要用指针来传递
+   
+   当从内核向进程中传递socket结构时，内核需要向进程传递它在socket中写入了多少数据，避免进程读取时越界。仅当这种情况下才会使用指针来传递，因为值传递会拷贝变量，不能进行传递，因此需要将数据写入到指针所指的地址中，达到传递消息的目的。
+
+2. 为什么`readn`和`writen`函数都将`void*`型指针转换为`char*`型指针
+   
+   在读取和写入数据时，是以字节为单位的，而char的大小刚好为一字节，将`void*`转换为`char*`便于读取和写入。同时void* 指针没有类型，无法取值。
+
+3. 试写一个名为`inet_pton_loose`的函数，它能处理以下情形：如果地址族为`AF_INET`且`inet_pton`返回0，那就调用`inet_aton`看是否成功；类似地，如果地址族为`AF_INET6`且`inet_pton`返回0，那就调用`inet_aton`看是否成功，若成功则返回其`IPv4`映射的`IPv6`地址
+   
+   ```
+   int inet_pton_loose(int family, const char* ptrstr, void* addrptr)
+   {
+       int ret_code;
+       if(family == AF_INET){
+           //用户指定类型为IPv4，如果不符合，则说明该地址为IPv6，直接从ptrstr中返回该地址
+           int code = inet_pton(AF_INET, ptrstr, addrptr);
+           if(code == 0){
+               //说明是IPv6格式的地址，或错误格式
+               ret_code = inet_aton(ptrstr, (struct in_addr*)addrptr);//inet_aton接受in_addr类型的指针，因此需要进行类型转换
+           }
+       }
+       else if(family == AF_INET6){
+            //用户指定类型为IPv6，如果不符合则说明该地址为IPv4，转换为IPv6后返回
+            int code = inet_pton(AF_INET6, ptrstr, addrptr);
+            if(code == 0){
+                //说明是IPv4格式的地址，或错误地址
+                ret_code = inet_aton(ptrstr, (struct in_addr*)addrptr);
+                //将IPv4地址转换为IPv6地址
+                char newptr[16];
+                bzero(newptr, 10);
+                memset(newptr+10, 16, 2);
+                memcpy(newptr+12, ptrstr, 4);
+                ptrstr = newptr;
+            }
+       }
+       return ret_code;
+   }
+   ```
