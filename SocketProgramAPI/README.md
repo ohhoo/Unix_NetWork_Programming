@@ -162,3 +162,8 @@ ssize_t readline(int filedes, void* buff, size_t maxlen);//每读取一个字节
        return ret_code;
    }
    ```
+   将IPv4地址映射为IPv6地址的方法是在IPv4地址前加上固定的前缀，例如
+   ```
+   IPv4: 10.65.199.122
+   IPv6: ::ffff:10.65.199.122
+   ```
