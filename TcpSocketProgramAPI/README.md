@@ -60,3 +60,97 @@ int bind(int sockfd, const struct sockaddr* myaddr, socklen_t addrlen);
 
 <font color=#FF000>因此，对于`bind`函数可以指定IP地址与端口号，也可以不指定。如果不指定端口号，则会在`bind`函数调用时选择一个临时端口,该端口号无法通过参数进行返回;而如果不指定IP地址，则会在连接建立(TCP)或者数据报发出时(UDP)选择一个IP地址</font>如果需要获取临时选择的IP、端口号信息，则需要调用`getsockname`函数；
 
+
+## listen 函数
+`listen`函数将一个socket转换为一个被动socket，并指示内核应当接受指向该socket的连接。`listen`函数仅由TCP服务器调用
+```c
+#include <sys/socket.h>
+int listen(int sockfd, int backlog);
+```
+参数`sockfd`是socket描述符，参数`backlog`规定了内核应当为相应socket排队的最大连接数(包括已建立的连接与等待建立的连接)，一般的`backlog`默认为5
+
+`listen`的作用就是在某个socket上监听连接
+
+`backlog`参数规定的最大连接数实际上是要乘以1.5的，即实际允许的已完成连接数与未完成连接数之和大于`backlog`，当一个连接建立后(服务器接收到客户端的ACK分节)后，将该连接从未完成连接队列移至已完成连接队列。当这些队列全满时，如果有客户端的SYN分节到达(建立连接请求)，服务器将会忽略该请求，使客户端触发异常重传，而不是回复一个RST分节(标识异常连接)，是客户明白是由于队列满而无法接受连接请求。
+
+当连接建立后，服务器尚未调用`accept`函数正式接受连接之前，处于连接建立完成队列中的连接可以接受数据，但其能够接受数据的大小为已连接socket的缓冲区的大小。
+
+## accept 函数
+该函数在TCP服务器上进行调用，从已完成连接队列的头部返回下一个已完成的连接。当已完成连接队列为空时，进程将进入休眠。
+```c
+#include <sys/socket.h>
+int accept(int sockfd, struct sockaddr* cliaddr, socklen_t* addrlen);
+```
+参数`sockfd`时监听socket的描述符，参数`cliaddr`与`addrlen`用来返回已连接的对端进程的协议地址，地址信息在`cliaddr`中返回，参数`addrlen`标明地址结构的长度。(当我们对客户端的地址信息不感兴趣时，可以不用获取协议地址信息，将后两个指针类型的参数赋值空指针即可)
+
+当`accept`执行成功后，将返回一个新的socket描述符，该描述符标明了一个`已连接socket`，`accept`从监听socket处获得新的连接，并返回一个全新的`socket`，应当注意这两个`socket`是不同的。
+
+
+## fork 、 exec 函数
+这两个函数提供了服务器并发处理的基本能力，其中`fork`函数是`Unix`中派生新进程的唯一办法，`exec`函数是存放在硬盘上的可执行文件被Unix执行的唯一办法(`exec`函数有六种类型)。
+```c
+#include <unistd.h>
+
+pid_t fork(void)
+
+int execl(const char* pathname, const char* arg0, ...);
+
+int execv(const char* pathname, char* const *argv[]);
+
+int execle(const char* pathname, const char* arg0, ...);
+
+int execve(const char* pathname, char* const argv[], char* const envp[]);
+
+int execlp(const char* filename, char const *arg0, ...);
+
+int execvp(const char* filename, char* const argv[]);
+```
+对于`fork`函数，最为特殊的是它调用一次，返回两次，在调用`fork`函数的进程中(父进程)返回一次，本次的返回值是派生的新进程的进程号，在子进程中返回一次，返回值为0。
+
+`fork`在执行新进程创建时，其实是将父进程进行了复制(对内核中描述进程信息的task_struct结构进行了复制)并创建了一个新的进程地址空间与堆栈，这新的进程地址空间与堆栈与父进程使用的实际上是同一个(映射到了同一个物理内存页上)，只有在子进程向进程地址空间中进行写操作时，才会实际地分配一个新的页面给新进程使用(写时拷贝机制)。因此在调用了`fork`后创建的新进程可以通过共享的socket描述符来操作对应的socket。
+
+<font color=#FF000>注意，每一个socket或文件都会有一个引用计数，当进行`fork`后，父进程与子进程共享socket，因此每个socket的引用计数变成了2，所以需要先关闭父进程中对应的socket，这个并不会导致socket实际上被关掉，只是将引用计数减一，只有当引用计数为0时，socket才会被关闭回收。</font>
+
+对于`exec`系列的函数，`execve`函数是系统调用，其余都是调用`execve`的库函数。这几个函数执行的操作都是将当前进程映像替换成新的程序文件，该新程序通常从`main`函数开始执行，在整个过程中不会创建新的进程。这些函数的参数中`pathname`标明了待执行的程序文件路径，而后续的`argv`、`arg0`等参数标明了`pathname`指向的新程序的参数，区别在于这些参数的组织形式是一个个列出还是由数组保存。
+
+
+## close 函数
+`close`函数对一个已经建立的连接进行关闭。
+```c
+#include <unistd.h>
+int close(int sockfd);
+```
+`close`函数的默认行为是将参数`sockfd`标识的socket标记为已关闭，然后立即返回到调用进程中，该进程不能再向对应的socket写入或者读取数据。当该socket中已经排队等待发送的数据发送完成后，该socket发送FIN分节结束连接。
+
+`close`实际上是将socket的引用计数减一，并不直接使socket发送FIN分节。
+
+
+## getsockname 、 getpeername 函数
+这两个函数用来获取与某个套接字关联的本地协议地址，或者是与某个套接字关联的外地协议地址。
+```c
+#include <sys/socket.h>
+int getsockname(int sockfd, struct sockaddr* localaddr, socklen_t* addrlen);
+int getpeername(int sockfd, struct sockaddr* peeraddr, socklen_t* addrlen);
+```
+这两个函数的后两个参数都是值-结果类型，获取到的协议地址与长度都通过这两个值-结果参数进行返回。
+
+`getsockname`能够获取本地的内核自动选择的IP地址、端口号、地址族信息。
+`getpeername`常用于服务器获取客户端的IP地址、端口号信息。
+
+## 习题
+1. 我们说头文件`<netinet/in.h>`中定义的`INADDR_`常值是主机字节序的，应当如何辨别？
+   
+
+2. 把图1-5改为在`connect`成功返回后调用`getsockname`。显示赋予TCP socket的本地IP地址与端口号
+   
+   部分代码如下。
+   ```c
+    struct sockaddr_in test;
+    bzero(&test,sizeof(test));
+    socklen_t len = sizeof(test);//当直接声明len而不赋值时，结果均为0，因为默认len为0，所以就不写入信息
+    if(getsockname(sockfd, (SA*)& test, &len) < 0>)
+        err_sys("error);
+
+    printf("local ip = %d\n", test.sin_addr.s_addr);
+    printf("local port = %d\n", test.sin_port);
+   ```
