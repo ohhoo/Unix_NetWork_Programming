@@ -191,7 +191,7 @@ int getpeername(int sockfd, struct sockaddr* peeraddr, socklen_t* addrlen);
 
 4. 在时间服务器程序中，将端口号从13改为9999(这样就不需要超级用户特权就能启动程序)，再删除`listen`调用，将会发生什么？
    ```
-   删掉了listen调用，在运行时会出现accept函数执行报错，将不会接收指向fd的连接请求
+   删掉了listen调用，在运行时会出现accept函数执行报错，不会接收指向fd的连接请求，因为listen的作用是将指定的socket转换为可以接受连接的socket，如果删除了listen，则fd不具备接受连接的资格。
    ```
 
 5. 继续上一题，删掉了`bind`调用，但是保留`listen`调用，将会发生什么？
