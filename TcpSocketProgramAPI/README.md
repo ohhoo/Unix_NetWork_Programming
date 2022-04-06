@@ -139,7 +139,17 @@ int getpeername(int sockfd, struct sockaddr* peeraddr, socklen_t* addrlen);
 
 ## 习题
 1. 我们说头文件`<netinet/in.h>`中定义的`INADDR_`常值是主机字节序的，应当如何辨别？
-   
+   ```c
+    #define	INADDR_UNSPEC_GROUP	(u_int32_t)0xe0000000	/* 224.0.0.0 */
+    #define	INADDR_ALLHOSTS_GROUP	(u_int32_t)0xe0000001	/* 224.0.0.1 */
+    #define	INADDR_ALLRTRS_GROUP	(u_int32_t)0xe0000002	/* 224.0.0.2 */
+    #define	INADDR_ALLRPTS_GROUP	(u_int32_t)0xe0000016	/* 224.0.0.22, IGMPv3 */
+    #define	INADDR_CARP_GROUP	(u_int32_t)0xe0000012	/* 224.0.0.18 */
+    #define	INADDR_PFSYNC_GROUP	(u_int32_t)0xe00000f0	/* 224.0.0.240 */
+    #define	INADDR_ALLMDNS_GROUP	(u_int32_t)0xe00000fb	/* 224.0.0.251 */
+    #define	INADDR_MAX_LOCAL_GROUP	(u_int32_t)0xe00000ff	/* 224.0.0.255 */
+   ```
+   程序中的定义如上所示，可以看出这是按照主机序定义的。
 
 2. 把图1-5改为在`connect`成功返回后调用`getsockname`。显示赋予TCP socket的本地IP地址与端口号
    
@@ -153,4 +163,39 @@ int getpeername(int sockfd, struct sockaddr* peeraddr, socklen_t* addrlen);
 
     printf("local ip = %d\n", test.sin_addr.s_addr);
     printf("local port = %d\n", test.sin_port);
+   ```
+
+3. 在一个并发服务器中，假设`fork`调用返回后，子进程先运行，而且子进程随后在`fork`调用返回父进程之前就完成了对客户的服务。下面程序中的两个`close`调用将会发生什么？
+   ```c
+   pid_t pid;
+   int listenfd,connfd;
+
+   listenfd = Socket(...);
+   
+   Bind(listenfd,...);
+   Listen(listenfd, LISTENQ);
+
+   for(;;){
+       connfd = Accept(listenfd,...);
+       if( (pid = Fork()) == 0){
+           Close(listenfd);
+           doit(connfd);
+           Close(connfd);
+           exit(0);
+       }
+       Close(connfd);
+   }
+
+   ```
+   对于`connfd`执行`Close`，第一次将会把`connfd`对应的socket的引用计数减一，但此时`connfd`对应的socket的引用计数不为0，因此不会发送FIN分节关闭连接，而第二次执行`Close`后`connfd`对应的socket引用计数为0，将会发送FIN分级，进入TCP四次挥手断开连接的过程。
+
+4. 在时间服务器程序中，将端口号从13改为9999(这样就不需要超级用户特权就能启动程序)，再删除`listen`调用，将会发生什么？
+   ```
+   删掉了listen调用，在运行时会出现accept函数执行报错，将不会接收指向fd的连接请求
+   ```
+
+5. 继续上一题，删掉了`bind`调用，但是保留`listen`调用，将会发生什么？
+   
+   ```
+   使用getsockname获取listenfd对应的IP地址与端口号，得到：IP地址为0，端口号为26581，这说明系统为监听socket选择了一个随机端口。
    ```
