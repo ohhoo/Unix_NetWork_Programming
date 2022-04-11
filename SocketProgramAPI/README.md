@@ -2,6 +2,7 @@
 ## socket地址结构
 IPv4版本
 ```c
+#include <netinet/in.h>
 struct in_addr{
     in_addr_t s_addr;   //实际是一个32位无符号int型数据，存储32位的网络地址
 }
