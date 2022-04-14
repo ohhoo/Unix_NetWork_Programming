@@ -25,7 +25,8 @@ int main(int argc, char* argv[]){
         connfd = Accept(listenfd, (SA*)&cliaddr, &clilen);
         //accept新创建的socket使用与监听socket相同的端口号
         //但是连接是由服务器及客户端的socket共同确定，端口号只起到标识应用的作用。
-
+        char hello[] = "Welcome";
+        write(connfd, hello, sizeof(hello));
         if( (childpid = Fork()) == 0 ){//进入子进程
             Close(listenfd);//关闭监听socket(将listenfd的引用计数减一)
             str_echo(connfd);//回显、处理

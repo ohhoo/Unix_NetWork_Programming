@@ -18,6 +18,10 @@ int main(int argc, char* argv[]){
 
     //建立连接
     Connect(sockfd, (SA*)&servaddr, sizeof(servaddr));
+    char welcome[40];
+    read(sockfd,welcome,sizeof(welcome)-1);
+
+    printf("%s\n",welcome);
 
     str_cli(stdin, sockfd);
 

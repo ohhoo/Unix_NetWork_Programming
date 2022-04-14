@@ -32,7 +32,7 @@ int main(int argc, char* argv[]){
         //accept新创建的socket使用与监听socket相同的端口号
         //但是连接是由服务器及客户端的socket共同确定，端口号只起到标识应用的作用。
 
-        if((connfd = accept(listenfd, (SA*)&servaddr, &clilen)) < 0){
+        if((connfd = accept(listenfd, (SA*)&cliaddr, &clilen)) < 0){
             if(errno == EINTR)
                 continue;//当前进程阻塞于一个慢系统调用()
                 //在捕获某个信号且相应信号处理函数返回时，阻塞的慢系统调用可能会返回一个EINTR错误
