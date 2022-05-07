@@ -192,4 +192,25 @@ INFTIM      永远等待直到有描述符就绪
 
 
 ## 习题
-1. 
+1. 我们说过一个描述符集合可以C语言的赋值语句赋给另一个描述符集。如果描述符集是一个整形数组，那么这如何做到？
+   
+   
+   在系统中，描述符集合是一个结构体，该结构体的声明如下所示
+   ```c
+   typedef struct{
+   #ifdef __USE_XOPEN
+       __fd_mask fds_bits[];
+   #define __FDS_BITS(set) ((set)->fd_bits)
+   #else
+       __fd_mask __fds_bits[__FD_SETSIZE / __NFDBITS];
+   #define __FDS_BITS(set) ((set)->__fds_bits)
+   #endif
+   } fd_set;
+   ```
+   在c语言中，两个结构之间是可以互相通过等号赋值的，但是数组不可以。如果需要用数组对另一个数组进行赋值，则需要使用`memcpy`函数或者将数组封装在结构体中
+
+2. 6.3节讨论`select`返回可写条件时，为什么必须限定socket为非阻塞才可以说一次写操作将返回一个正值？
+   
+   这是因为当socket是阻塞时，如果要写入的数据大于发送缓冲区的最大标识，那么程序将会阻塞在`write`调用上，直到发送缓冲区的空闲空间大于要写入的数据大小为止。
+   
+   其他事项可以参考[连接](https://blog.csdn.net/analogous_love/article/details/118998472)中的说明
